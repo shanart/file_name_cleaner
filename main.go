@@ -22,17 +22,6 @@ func randomString(n int) string {
 	return string(s)
 }
 
-func checkAlphaChar(charVariable rune) bool {
-
-	if (unicode.Is(unicode.Cyrillic, charVariable)) ||
-		(unicode.IsLetter(charVariable)) ||
-		(strings.ContainsRune("!@#$%^&*()_+~", charVariable)) {
-		return true
-	}
-
-	return false
-}
-
 func is_path_exists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -52,35 +41,25 @@ func sanitize_name(name string, ext *string) string {
 	return strings.TrimSpace(strings.Replace(name, *ext, "", 1))
 }
 
-func name_cleaner(file fs.FileInfo, alter string) string {
-
+// Clean filename of all special characters and numbers
+// from the file name begining until it find first letter.
+// And return cleaner file_name
+func name_cleaner(file fs.FileInfo) string {
 	file_ext := get_file_ext(file.Name())
 	file_name := sanitize_name(file.Name(), &file_ext)
 	var index int
 
-	for i, L := range file_name {
-		if checkAlphaChar(rune(L)) {
+	for i, l := range file_name {
+		index = i
+		if unicode.IsLetter(l) {
 			break
 		}
-		index = i
 	}
 
-	a_file_name := file_name[index:]
-	if len(alter) > 0 {
-		a_file_name = a_file_name[index:] + alter
-	}
-
-	ex, _ := is_path_exists(a_file_name + file_ext)
-	if ex {
-		return name_cleaner(file, "_"+randomString(3))
-	} else {
-		return file_name[index:] + file_ext
-	}
+	return file_name[index:] + file_ext
 }
 
 func main() {
-
-	fmt.Println()
 
 	path := os.Args[1]
 	pathInfo, err := os.Stat(path)
@@ -97,16 +76,23 @@ func main() {
 
 		for _, file := range files {
 			if !file.IsDir() {
+				newFilePath := name_cleaner(file)
+				if newFilePath == file.Name() {
+					continue
+				}
 
-				// abs, err := filepath.Abs(filepath.Join(path, file.Name()))
-				// if err != nil {
-				// 	log.Fatal(err)
-				// }
+				abs, err := filepath.Abs(filepath.Join(path, newFilePath))
+				if err != nil {
+					log.Fatal(err)
+				}
 
-				newFileName := name_cleaner(file, "")
-				newFilePath, _ := filepath.Abs(filepath.Join(path, newFileName))
+				_, err = os.Stat(abs)
+				if os.IsNotExist(err) {
+					fmt.Println("Process: ", abs)
+				} else {
+					fmt.Println("Rename: ", abs)
+				}
 
-				fmt.Println(newFilePath)
 				// err = os.Rename(abs, newFilePath)
 				// if err != nil {
 				// 	log.Fatal(err)
@@ -118,6 +104,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		name_cleaner(file, "")
+		name_cleaner(file)
 	}
 }
