@@ -1,23 +1,36 @@
 package main
 
 import (
+	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
-func checkAlphaChar(charVariable rune) bool {
-	if (charVariable >= 'a' && charVariable <= 'z') ||
-		(charVariable >= 'A' && charVariable <= 'Z') ||
-		(charVariable >= 'а' && charVariable <= 'я') ||
-		(charVariable >= 'А' && charVariable <= 'Я') {
-		return true
-	} else {
-		return false
+func randomString(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+	s := make([]rune, n)
+	for i := range s {
+		s[i] = letters[rand.Intn(len(letters))]
 	}
+	return string(s)
+}
+
+func checkAlphaChar(charVariable rune) bool {
+
+	if (unicode.Is(unicode.Cyrillic, charVariable)) ||
+		(unicode.IsLetter(charVariable)) ||
+		(strings.ContainsRune("!@#$%^&*()_+~", charVariable)) {
+		return true
+	}
+
+	return false
 }
 
 func is_path_exists(path string) (bool, error) {
@@ -39,7 +52,7 @@ func sanitize_name(name string, ext *string) string {
 	return strings.TrimSpace(strings.Replace(name, *ext, "", 1))
 }
 
-func name_cleaner(file fs.FileInfo) string {
+func name_cleaner(file fs.FileInfo, alter string) string {
 
 	file_ext := get_file_ext(file.Name())
 	file_name := sanitize_name(file.Name(), &file_ext)
@@ -52,10 +65,23 @@ func name_cleaner(file fs.FileInfo) string {
 		index = i
 	}
 
-	return file_name[index:] + file_ext
+	a_file_name := file_name[index:]
+	if len(alter) > 0 {
+		a_file_name = a_file_name[index:] + alter
+	}
+
+	ex, _ := is_path_exists(a_file_name + file_ext)
+	if ex {
+		return name_cleaner(file, "_"+randomString(3))
+	} else {
+		return file_name[index:] + file_ext
+	}
 }
 
 func main() {
+
+	fmt.Println()
+
 	path := os.Args[1]
 	pathInfo, err := os.Stat(path)
 	if err != nil {
@@ -72,27 +98,19 @@ func main() {
 		for _, file := range files {
 			if !file.IsDir() {
 
-				abs, err := filepath.Abs(filepath.Join(path, file.Name()))
-				if err != nil {
-					log.Fatal(err)
-				}
+				// abs, err := filepath.Abs(filepath.Join(path, file.Name()))
+				// if err != nil {
+				// 	log.Fatal(err)
+				// }
 
-				newFileName := name_cleaner(file)
+				newFileName := name_cleaner(file, "")
 				newFilePath, _ := filepath.Abs(filepath.Join(path, newFileName))
 
-				// TODO: check if path exist
-				// if true - alter filename and check egain.
-				// while condition become false - it mean that path does not exists
-				// and we can save the file with new path
-				ex, err := is_path_exists(newFilePath)
-				if ex != false {
-
-				}
-
-				err = os.Rename(abs, newFilePath)
-				if err != nil {
-					log.Fatal(err)
-				}
+				fmt.Println(newFilePath)
+				// err = os.Rename(abs, newFilePath)
+				// if err != nil {
+				// 	log.Fatal(err)
+				// }
 			}
 		}
 	} else {
@@ -100,6 +118,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		name_cleaner(file)
+		name_cleaner(file, "")
 	}
 }
