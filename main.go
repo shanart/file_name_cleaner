@@ -81,6 +81,11 @@ func main() {
 
 		for _, file := range files {
 			if !file.IsDir() {
+
+				if !strings.HasSuffix(file.Name(), ".mp3") {
+					continue
+				}
+
 				i := 0
 				newFilePath := name_cleaner(file)
 				if newFilePath == file.Name() {
